@@ -382,8 +382,8 @@ def preprocess_and_predict(packets):
     # trong SW chỉ có 1 file unique nên lấy ra file đó
     predictFile=find_the_way('./SW','_SW.csv')
     print('predict file:',predictFile[0])
-    
-    df = pd.read_csv(predictFile[0],usecols=cols)#,header=None )
+
+    df = pd.read_csv(predictFile[0],usecols=[*cols,'ID'])#,header=None )
     df=df.fillna(0)
     X_test=df[cols]
     new_predictions = model.predict(X_test)
@@ -393,7 +393,9 @@ def preprocess_and_predict(packets):
             if new_predictions[i] == 1:  # Nếu có tấn công
                 row = [df['ID'][i], predictFile[0], 'Syn_flood']  # ID là i, Name là tên file, Result là 1
                 writer.writerow(row)
+                print("_________________________________________________________________________________________")
                 print('Thiết bị đang bị tấn công Syn Flood, Với ID: ',df['ID'][i])
+                print("_________________________________________________________________________________________")
             else:
                 row = [df['ID'][i], predictFile[0], 'Bengin']  # ID là i, Name là tên file, Result là 0
                 writer.writerow(row)
@@ -403,7 +405,7 @@ if __name__ == "__main__":
     print("Starting real-time SYN Flood detection...")
     model = joblib.load("./model/RF_SYN_1_model.pkl")
     # Tạo file kết quả
-    result_file = "report.csv"
+    result_file = "./report/report.csv"
     if not os.path.exists(result_file):
         with open(result_file, mode='w', newline='') as file:
             writer = csv.writer(file)
