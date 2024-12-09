@@ -391,13 +391,13 @@ def preprocess_and_predict(packets):
         writer = csv.writer(file)
         for i in range(len(new_predictions)):
             if new_predictions[i] == 1:  # Nếu có tấn công
-                row = [df['ID'][i], predictFile[0], 'Syn_flood']  # ID là i, Name là tên file, Result là 1
+                row = [datetime.now().strftime('%Y-%m-%d %H:%M:%S') ,df['ID'][i], predictFile[0], 'Syn_flood']  # ID là i, Name là tên file, Result là 1
                 writer.writerow(row)
                 print("_________________________________________________________________________________________")
                 print('Thiết bị đang bị tấn công Syn Flood, Với ID: ',df['ID'][i])
                 print("_________________________________________________________________________________________")
             else:
-                row = [df['ID'][i], predictFile[0], 'Bengin']  # ID là i, Name là tên file, Result là 0
+                row = [datetime.now().strftime('%Y-%m-%d %H:%M:%S') ,df['ID'][i], predictFile[0], 'Bengin']  # ID là i, Name là tên file, Result là 0
                 writer.writerow(row)
     print('No of Syn Flood:',np.count_nonzero(new_predictions == 1))
 
@@ -409,7 +409,7 @@ if __name__ == "__main__":
     if not os.path.exists(result_file):
         with open(result_file, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["ID", "Name file pcap", "Result"])  # Ghi header
+            writer.writerow(["Time","ID", "Name file pcap", "Result"])  # Ghi header
     threading.Thread(target=packet_sniffer, daemon=True).start()
     threading.Thread(target=packet_processor, daemon=True).start()
     
