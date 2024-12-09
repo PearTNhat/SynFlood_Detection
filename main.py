@@ -31,20 +31,23 @@ Z = 0x00
 MF= 0x01
 DF= 0x02
 PCAP_FOLDER = "./pcaps"  # Thư mục lưu file PCAP
-BUFFER_SIZE = 1000  # Giới hạn số lượng gói tin trong hàng đợi
-WINDOW_SIZE=100
+BUFFER_SIZE = 10000  # Giới hạn số lượng gói tin trong hàng đợi
+WINDOW_SIZE=500
 packet_queue = queue.Queue(maxsize=BUFFER_SIZE)
 pcap_packets = []
+index = 0
+
 pcap_history= queue.Queue(maxsize=WINDOW_SIZE) # Lưu lịch sử các file PCAP đã lưu để tiến hành phân tích
 # Hàm bắt gói tin và thêm vào hàng đợi
 def packet_sniffer():
+    global WINDOW_SIZE
     def enqueue_packet(packet):
         if not packet_queue.full():
             packet_queue.put(packet)
             pcap_packets.append(packet)
 
         # Khi đủ 100 gói tin, lưu vào file PCAP
-        if len(pcap_packets) >= 100:
+        if len(pcap_packets) >= WINDOW_SIZE:
             save_pcap()
 
     sniff(iface="Wi-Fi", prn=enqueue_packet, store=0)
@@ -52,7 +55,9 @@ def packet_sniffer():
 # Hàm lưu gói tin vào file PCAP
 def save_pcap():
     global pcap_packets
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    global index
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_"+str(index))
+    index+=1
     pcap_file = os.path.join(PCAP_FOLDER, f"captured_{timestamp}.pcap")
     wrpcap(pcap_file, pcap_packets)
     pcap_history.put(pcap_file)
@@ -259,7 +264,7 @@ def preprocess_and_predict(packets):
             df.to_csv("temp.csv")
 
             df=pd.read_csv("temp.csv")
-            
+            df["WS_src"].fillna('')
             df["ID"] = df["WS_src"]+"=>"+df["WS_dst"]
             
             df.drop(columns=["WS_src", "WS_dst"], inplace=True)
@@ -385,31 +390,50 @@ def preprocess_and_predict(packets):
 
     df = pd.read_csv(predictFile[0],usecols=[*cols,'ID'])#,header=None )
     df=df.fillna(0)
+    
     X_test=df[cols]
     new_predictions = model.predict(X_test)
+    flag= 0
     with open(result_file, mode='a', newline='') as file:
         writer = csv.writer(file)
         for i in range(len(new_predictions)):
             if new_predictions[i] == 1:  # Nếu có tấn công
+                flag=1
                 row = [datetime.now().strftime('%Y-%m-%d %H:%M:%S') ,df['ID'][i], predictFile[0], 'Syn_flood']  # ID là i, Name là tên file, Result là 1
                 writer.writerow(row)
-                print("_________________________________________________________________________________________")
                 print('Thiết bị đang bị tấn công Syn Flood, Với ID: ',df['ID'][i])
-                print("_________________________________________________________________________________________")
             else:
                 row = [datetime.now().strftime('%Y-%m-%d %H:%M:%S') ,df['ID'][i], predictFile[0], 'Bengin']  # ID là i, Name là tên file, Result là 0
                 writer.writerow(row)
-    print('No of Syn Flood:',np.count_nonzero(new_predictions == 1))
+        if(flag==0):
+            print("Không phát hiện tấn công")
+        print("_________________________________________________________________________________________")
+    files_sw=find_the_way('./SW','_SW.csv')
+    for i in files_sw:
+        os.rename(i,i.replace("./SW",'./historySW'))
+
 
 if __name__ == "__main__":
+    folder('./pcaps')
+    folder('./FE')
+    folder('./SW')
+    folder('./historySW')
+    folder('./report')
+    # fix lỗi WS_src khi trong pcaps có file _FE.csv
+    exist_FE=find_the_way('./pcap','_FE.csv')
+    for i in exist_FE:
+        os.remove(i)
+    existSW=find_the_way('./SW','_FE.csv')
+    for i in existSW:
+        os.remove(i)
     print("Starting real-time SYN Flood detection...")
     model = joblib.load("./model/RF_SYN_1_model.pkl")
+    # model = joblib.load("./model/syn_flood_detection.pkl")
     # Tạo file kết quả
     result_file = "./report/report.csv"
-    if not os.path.exists(result_file):
-        with open(result_file, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(["Time","ID", "Name file pcap", "Result"])  # Ghi header
+    with open(result_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Time","ID", "Name file pcap", "Result"])  # Ghi header
     threading.Thread(target=packet_sniffer, daemon=True).start()
     threading.Thread(target=packet_processor, daemon=True).start()
     
